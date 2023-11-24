@@ -217,9 +217,11 @@ P(B)：电子邮件包含特定关键词的概率。可以通过统计所有已�
 pred_y = xw + b;
 
 这里x是一个向量，表示特征（自变量）的数量。
+
+那么模型训练的目的就是找到一个特征，能够与真实值差异满足要求。这个过程就会用到上面的各类基础知识了。
 ```
 
-同样引用GPT的例子，用房价预测作为案例：
+引用GPT的例子，用房价预测作为案例：
 ```python
 import torch
 import torch.nn as nn
@@ -282,3 +284,144 @@ new_x = torch.tensor([[7.5]])  # 假设新房屋的面积为7.5
 predicted_y = model(new_x)
 print('Predicted price:', predicted_y.item())
 ```
+
+
+### softmax回归
+`softmax`回归也是一种线性回归。原理是借用`softmax`公式，可以将多个分类的`pred_y`映射成`0 <= pred_y_i <= 1`这种概率区间，且`sum(pred_y) == 1`。
+
+有了这个特性，我们就可以将`pred_y_i`与`label_i`（也就是真实标签），关联起来。通过最大似然（也就是负对数似然，等价于交叉熵损失函数）或者交叉熵损失函数，使预测结果与实际类型逼近。
+
+和普通线性回归一样，假设我们现在要对一个`2*2`大小的灰度图进行狗、猫、鸟、牛分类，那么它的回归公式可以定义为：
+```python
+pred_y = XW + b;
+
+这里的X就是一个2*2的矩阵了，w同样是一个2*2的矩阵，b是一个长度为4（分类数）的向量。
+
+为了方便处理，我们可以将灰度图数据归一化，然后将X和W拉伸成一个向量。
+
+可以发现它和普通线性回归实际上就是多了一步softmax(pred_y)的操作。
+
+借用GPT对softmax的解释：
+在 Softmax 线性回归中，假设有一个输入特征向量 x 和对应的标签 y，其中 x 是一个长度为 d 的向量，表示输入的特征，
+y 是一个表示类别的整数。Softmax 线性回归旨在通过学习一个权重矩阵 W 和偏置向量 b，将输入特征 x 映射到类别概率分布。
+
+具体而言，给定输入特征向量 x，Softmax 线性回归模型首先计算每个类别的得分（score），记作 s = Wx + b，
+其中 W 是一个大小为 C×d 的权重矩阵，b 是一个长度为 C 的偏置向量，C 表示类别的数量。得分向量 s 的每个元素表示该类别的得分。
+
+```
+
+#### softmax函数
+它的公式参考：
+```python
+Softmax函数：Softmax函数用于将模型的原始输出转换为类别的概率分布。
+给定模型的输出向量z=[z1, z2, ..., zK]，其中K是类别的数量，Softmax函数的计算公式如下：
+
+softmax(z_i) = exp(z_i) / (∑(exp(z_j)) for j=1 to K)
+
+其中，z_i是模型的输出向量z的第i个元素。Softmax函数对输出向量中的每个元素进行指数运算，并将其除以所有元素的指数之和，以确保所有类别的概率之和为1。
+```
+
+#### 独热码
+独热码是一种用来表示分类类型的编码。它可以将模型输入与真实标签关联起来：
+
+```python
+假设模型输出是对狗、猫、鸟、牛这四类动物的概率，且已经经过softmax处理。
+
+pred_y = [0.1, 0.3, 0.2, 0.4]
+label = [0, 0, 0, 1]
+
+这里label[3] == 1，也就表示真实类型是第三种分类，牛，模型对应的输出是0.4;
+
+依然是上面的例子，这次label变成了：
+label = [1, 0, 0, 0]，说明真实类型是第零种分类，狗，模型对应输出是0.1，与实际结果差异较大。这种情况就需要通过损失函数优化了。
+```
+
+#### 损失函数
+softmax回归里一般会用到小化交叉熵作为损失函数。它的公式为：`L = -∑(y_i * log(p_i))`，其中，y_i是实际标签的第i个元素，p_i是模型预测的概率分布的第i个元素。
+
+交叉熵损失函数的目标是最小化损失值，使得模型的预测概率分布尽可能接近实际标签的概率分布。
+
+结合前面的独热码，因为单分类中只有真实标签概率为1，所以计算Loss时最小化的损失，实际上就是最大化预测概率。
+
+另外要注意，`nn.CrossEntropyLoss()`这个损失函数中，就已经包含了`softmax`，所以模型输出可以不进行规范化直接扔进去。
+
+#### 手写数字分类
+GPT的例子，类似的分类问题都可以这样设计：
+
+```python
+
+import torch
+import torch.nn as nn
+import torchvision
+import torchvision.transforms as transforms
+
+# 超参数设置
+num_epochs = 10
+
+# 一批量读取的数据量
+batch_size = 100
+
+# 学习率
+learning_rate = 0.001
+
+# MNIST数据集下载和预处理
+train_dataset = torchvision.datasets.MNIST(root='./data', train=True, transform=transforms.ToTensor(), download=True)
+test_dataset = torchvision.datasets.MNIST(root='./data', train=False, transform=transforms.ToTensor())
+
+# 数据加载器
+train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
+test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)
+
+# Softmax回归模型
+class SoftmaxRegression(nn.Module):
+    def __init__(self, input_size, num_classes):
+        super(SoftmaxRegression, self).__init__()
+        self.linear = nn.Linear(input_size, num_classes)
+
+    def forward(self, x):
+		# 模型输出，因为损失函数已经有softmax，所以不需要规范化
+        out = self.linear(x)
+        return out
+
+model = SoftmaxRegression(28*28, 10)
+
+# 损失函数和优化器
+criterion = nn.CrossEntropyLoss()
+optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
+
+# 训练模型
+total_step = len(train_loader)
+for epoch in range(num_epochs):
+	# 读取图片
+    for i, (images, labels) in enumerate(train_loader):
+		# 图片数据拉平
+        images = images.reshape(-1, 28*28)
+
+        # 前向传播和计算损失
+		# 这里没做加权和偏置
+        outputs = model(images)
+        loss = criterion(outputs, labels)
+
+        # 反向传播和优化
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        if (i+1) % 100 == 0:
+            print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'.format(epoch+1, num_epochs, i+1, total_step, loss.item()))
+
+# 在测试集上评估模型
+model.eval()
+with torch.no_grad():
+    correct = 0
+    total = 0
+    for images, labels in test_loader:
+        images = images.reshape(-1, 28*28)
+        outputs = model(images)
+        _, predicted = torch.max(outputs.data, 1)
+        total += labels.size(0)
+        correct += (predicted == labels).sum().item()
+
+    print('在测试集上的准确率: {} %'.format(100 * correct / total))
+```
+
