@@ -1,7 +1,8 @@
-[.doc]
+[toc]
 
 # ML
 > 记录《动手学习机器学习》的笔记，不会深入考究原理，只会贴出自己能够理解的方式。
+>
 > ~~所有结论都不保证正确...~~
 
 ## 基础知识
@@ -554,4 +555,127 @@ with torch.no_grad():
 
 关于激活函数还有梯度消失和梯度爆炸的问题。例如`sigmoid`，在值特别大或者特别小时可能出现导数为0的问题，这个在后面再介绍。
 
+
+### 过拟合和欠拟合
+过拟合和欠拟合都是评估模型性能的指标，但很难制定一个通用标准来衡量特定模型的性能。关于它们的概念：
+
+过拟合指的是模型在训练数据上表现得非常好，但在新数据上表现较差。这是因为模型过于复杂，过度拟合了训练数据中的噪声和细节，导致无法很好地泛化到新数据。过拟合的模型可能会记住训练数据中的每个细节，包括噪声，而忽略了数据中的整体趋势和模式。过拟合的模型可能会导致过高的方差，即对训练数据的变化非常敏感，但对新数据的变化不敏感。
+
+欠拟合指的是模型无法很好地拟合训练数据，也无法很好地泛化到新数据。这通常是因为模型过于简单，无法捕捉数据中的复杂关系和模式。欠拟合的模型可能会导致过高的偏差，即对数据的整体趋势和模式的理解不足。
+
+解决过拟合和欠拟合问题，我们可以采取以下方法：
+1. 增加训练数据：更多的训练数据可以帮助模型更好地学习数据的整体趋势和模式，减少过拟合和欠拟合的风险。
+2. 减少模型复杂度：通过减少模型的参数或限制模型的容量，可以降低过拟合的风险。例如，在神经网络中使用正则化技术，如L1或L2正则化，可以限制模型的复杂度。
+3. 特征选择：选择最相关和最有信息量的特征，可以帮助模型更好地捕捉数据中的关键模式，减少过拟合和欠拟合的风险。
+4. 交叉验证：使用交叉验证技术可以评估模型在不同数据集上的性能，帮助我们选择最合适的模型。
+5. 集成方法：使用集成方法，如随机森林或梯度提升树，可以结合多个模型的预测结果，减少过拟合和欠拟合的风险。
+
+接下来介绍防止这种问题的方法。
+
+#### 正则化
+正则化又称为权重衰减，它的作用是抑制模型过拟合，减少模型复杂度。考虑四分类问题：
+```python
+w = [0.1, 0.2, 0.4, 0.2]
+b = [0, 0, 0, 0]
+
+pred_y = Xw + b
+```
+
+上面代码中第三项的权重明显比其他项要大。那么模型训练时，就会更加偏向第三类。这就可能导致模型对其它分类的处理不如第三类，产生过拟合问题。
+
+为了防止这个问题，我们需要使用正则化对权重过大的项进行惩罚，具体如下：
+```python
+loss = MSELoss(pred_y_i, y_i) + λ / 2 * L2(w_i)^2
+```
+
+可以看到上面的代码在计算损失值时额外加上了`λ * L2(w_i^2)`，这里`λ`是一个标量，表示正则化参数；`L2(w_i)^2`是`L2`范数的平方（目的是简化求导）。这样就保证计算损失时，将权重也带入到了参考项中。
+
+设置正则化（权重衰减参数），有多种做法，具体参考`PyTorch`的文档：
+```python
+import torch
+import torch.nn as nn
+
+# 自定义线性模型类
+class LinearModel(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size):
+        super(LinearModel, self).__init__()
+
+        self.linear1 = nn.Linear(input_size, hidden_size)
+        self.relu = nn.ReLU()
+        self.linear2 = nn.Linear(hidden_size, output_size)
+
+        # 初始化第一层的权重和偏置
+        nn.init.normal_(self.linear1.weight, mean=0, std=0.1)
+        nn.init.constant_(self.linear1.bias, 0)
+
+    def forward(self, x):
+        out = self.linear1(x)
+        out = self.relu(out)
+        out = self.linear2(out)
+        return out
+
+# 创建一个包含3个输入特征、4个隐藏单元和2个输出特征的线性模型
+input_size = 3
+hidden_size = 4
+output_size = 2
+model = LinearModel(input_size, hidden_size, output_size)
+
+# weight_decay=0.01就是λ的值，过大可能导致欠拟合，过小又可能导致过拟合
+# 这里相当于对线性模型里每一层都做了正则化，因为LeRU层没有设置权重，
+# 所以不生效
+optimizer = optim.SGD(model.parameters(), lr=0.01, weight_decay=0.01)  # 设置weight_decay参数为正则化参数
+
+# 这样做也可以指定特定层正则化参数
+trainer = torch.optim.SGD([
+	{"params":model[0].weight,'weight_decay': wd},
+	{"params":model[0].bias}], lr=lr)
+```
+
+
+#### 暂退法
+暂退法则是通过随机丢弃一些神经元来达到过拟合的目的。需要注意的是，暂退法只会在训练过程中生效。
+```python
+import torch
+import torch.nn as nn
+import torch.optim as optim
+
+# 定义线性回归模型
+class LinearRegression(nn.Module):
+    def __init__(self, input_size, output_size, dropout_rate):
+        super(LinearRegression, self).__init__()
+        self.linear = nn.Linear(input_size, output_size)
+        self.dropout = nn.Dropout(dropout_rate)
+        
+    def forward(self, x):
+        x = self.dropout(x)
+        return self.linear(x)
+
+# 定义训练数据和标签
+x_train = torch.tensor([[1.0], [2.0], [3.0], [4.0]])
+y_train = torch.tensor([[2.0], [4.0], [6.0], [8.0]])
+
+# 初始化模型和优化器
+# 有20%的概率丢弃神经元
+model = LinearRegression(1, 1, dropout_rate=0.2)
+optimizer = optim.SGD(model.parameters(), lr=0.01)
+
+# 定义损失函数
+criterion = nn.MSELoss()
+
+# 训练模型
+num_epochs = 100
+for epoch in range(num_epochs):
+    # 前向传播
+    outputs = model(x_train)
+    loss = criterion(outputs, y_train)
+    
+    # 反向传播和优化
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+    
+    # 打印训练信息
+    if (epoch+1) % 10 == 0:
+        print('Epoch [{}/{}], Loss: {:.4f}'.format(epoch+1, num_epochs, loss.item()))
+```
 
