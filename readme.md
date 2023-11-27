@@ -382,6 +382,8 @@ class SoftmaxRegression(nn.Module):
 
     def forward(self, x):
 		# 模型输出，因为损失函数已经有softmax，所以不需要规范化
+		# 对输入的加权和偏置，可以在这里完成，也可以提取处理好
+		
         out = self.linear(x)
         return out
 
@@ -449,8 +451,107 @@ s1 --> s2[output]
 ```mermaid
 flowchart TD
 s1[input]
-s1 --> s2[output]
+s1 --> s2[若干激活函数]
+s2 --> s3[output]
 ```
 
+我们可以在输入输出间加入任意数量，任意层数的激活函数，但对应的，也会导致处理效率下降。输入与输出间激活函数的层数成为激活函数的深度，而一层中有多少个激活函数就是它的广度了。
+
+激活函数的深度和广度决定了模型性能以及表示能力。它们的数量需要根据实际情况调整。
 
 ### 激活函数
+激活函数是一种非线性的处理单元，有例如`sigmoid`、`tanh`等。通过这些非线性函数，我们能对输入进行更多处理。
+
+常用的感知函数有以下几种：
+1. 二值阶跃函数（Binary Step Function）：这是最简单的感知函数之一，它根据输入值是否大于等于阈值来决定神经元是否激活。当输入大于等于阈值时，输出为1；当输入小于阈值时，输出为0。
+2. 线性函数（Linear Function）：线性函数的输出与输入成正比，没有非线性变换。它的数学表达式为 f(x) = ax，其中 a 是常数。线性函数在简单任务中可能很有用，但在处理复杂模式时效果有限。
+3. Sigmoid 函数：Sigmoid 函数是一种常用的非线性激活函数，它将输入值映射到一个介于 0 和 1 之间的范围内。Sigmoid 函数的数学表达式为 f(x) = 1 / (1 + e^(-x))。Sigmoid 函数在二分类问题中常被用作输出层的激活函数，它可以将输出解释为概率。
+4. 双曲正切函数（Tanh Function）：双曲正切函数与 Sigmoid 函数类似，但它将输入值映射到一个介于 -1 和 1 之间的范围内。双曲正切函数的数学表达式为 f(x) = (e^x - e^(-x)) / (e^x + e^(-x))。双曲正切函数在处理具有负值的数据时比 Sigmoid 函数更适用。
+5. ReLU 函数：ReLU（Rectified Linear Unit）函数是一种常用的非线性激活函数，它在输入大于零时输出与输入相等，而在输入小于等于零时输出为零。ReLU 函数的数学表达式为 f(x) = max(0, x)。ReLU 函数在深度学习领域中非常流行，因为它能够有效地解决梯度消失问题，并且计算速度较快。
+
+下面是手写数字例子应用`ReLU`的例子（不过这里应该没什么提升，因为默认情况下图像像素总是大于0的）：
+```python
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torchvision.datasets as datasets
+import torchvision.transforms as transforms
+
+# 设置随机种子
+torch.manual_seed(2023)
+
+# 定义超参数
+# 输入大小、隐藏层大小、输出大小
+input_size = 784
+hidden_size = 256
+num_classes = 10
+num_epochs = 10
+batch_size = 100
+learning_rate = 0.001
+
+# 加载MNIST数据集
+train_dataset = datasets.MNIST(root='./data', train=True, transform=transforms.ToTensor(), download=True)
+test_dataset = datasets.MNIST(root='./data', train=False, transform=transforms.ToTensor())
+
+# 创建数据加载器
+train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
+test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)
+
+# 定义MLP模型
+model = nn.Sequential(
+    nn.Linear(input_size, hidden_size),
+	# 中间加入一个ReLU激活函数，也是全连接
+    nn.ReLU(),
+    nn.Linear(hidden_size, num_classes)
+)
+
+# 初始化模型
+# 指定权重和偏置
+def weights_init(m):
+    if isinstance(m, nn.Linear):
+        nn.init.xavier_uniform_(m.weight)
+        nn.init.constant_(m.bias, 0.0)
+
+model.apply(weights_init)
+
+# 定义损失函数和优化器
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+
+# 模型训练
+total_step = len(train_loader)
+for epoch in range(num_epochs):
+    for i, (images, labels) in enumerate(train_loader):
+        # 将图像数据展平为一维向量
+        images = images.reshape(-1, input_size)
+        
+        # 前向传播
+        outputs = model(images)
+        loss = criterion(outputs, labels)
+        
+        # 反向传播和优化
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        
+        if (i+1) % 100 == 0:
+            print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'.format(epoch+1, num_epochs, i+1, total_step, loss.item()))
+
+# 模型评估
+model.eval()
+with torch.no_grad():
+    correct = 0
+    total = 0
+    for images, labels in test_loader:
+        images = images.reshape(-1, input_size)
+        outputs = model(images)
+        _, predicted = torch.max(outputs.data, 1)
+        total += labels.size(0)
+        correct += (predicted == labels).sum().item()
+
+    print('Accuracy on the test images: {:.2f}%'.format(100 * correct / total))
+```
+
+关于激活函数还有梯度消失和梯度爆炸的问题。例如`sigmoid`，在值特别大或者特别小时可能出现导数为0的问题，这个在后面再介绍。
+
+
