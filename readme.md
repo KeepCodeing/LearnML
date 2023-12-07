@@ -847,13 +847,13 @@ conv2d = nn.Conv2d(1, 1, kernel_size=3, padding=1)
 
 通常，当垂直步幅为sh、水平步幅为sw时，输出形状为`[(nh − kh + ph + sh)/sh] × [(nw − kw + pw + sw)/sw]`如果我们设置了ph = kh − 1和pw = kw − 1，则输出形状将简化为`[(nh + sh − 1)/sh]× [(nw + sw − 1)/sw]` 。更进一步，如果输入的高度和宽度可以被垂直和水平步幅整除，则输出形状将为`(nh/sh) × (nw/sw)`。
 
-输出形状的计算参考：![Conv2d详解](https://blog.csdn.net/weixin_38481963/article/details/109924004)
+输出形状的计算参考：[Conv2d详解](https://blog.csdn.net/weixin_38481963/article/details/109924004)
 
 **多通道：**
 
 在处理RGB等多通道格式图片时，输入和输出的通道数就可能有变化了。用ci和co分别表示输入和输出通道的数目，并让kh和kw为卷积核的高度和宽度。为了获得多个通道的输出，我们可以为每个输出通道创建一个形状为ci × kh × kw的卷积核张量，这样卷积核的形状是co × ci × kh × kw。在互相关运算中，每个输出通道先获取所有输入通道，再以对应该输出通道的卷积核计算出结果。
 
-输出通道参考：![如何理解卷积神经网络中的通道](https://medlen.blog.csdn.net/article/details/109920512)
+输出通道参考：[如何理解卷积神经网络中的通道](https://medlen.blog.csdn.net/article/details/109920512)
 
 
 ### 池化
