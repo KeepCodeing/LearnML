@@ -855,3 +855,376 @@ conv2d = nn.Conv2d(1, 1, kernel_size=3, padding=1)
 
 输出通道参考：![如何理解卷积神经网络中的通道](https://medlen.blog.csdn.net/article/details/109920512)
 
+
+### 池化
+
+池化（Pooling）操作是深度学习中常用的一种操作，用于减小特征图的尺寸并提取主要特征。池化操作通常紧跟在卷积操作之后，通过对输入特征图的局部区域进行聚合或降采样，从而减少数据的维度。
+
+常见的池化操作有最大池化（Max Pooling）和平均池化（Average Pooling）。
+
+1. 最大池化（Max Pooling）：
+最大池化是通过从输入区域中选择最大值来进行聚合。池化窗口在输入特征图上滑动，每次选择窗口内的最大值作为输出特征图的一个元素。
+
+例如，对于一个2x2的最大池化操作，输入特征图的每个2x2的区域将被最大值所代替，从而减小了特征图的尺寸。
+
+2. 平均池化（Average Pooling）：
+平均池化是通过计算输入区域的平均值来进行聚合。与最大池化类似，池化窗口在输入特征图上滑动，每次计算窗口内元素的平均值作为输出特征图的一个元素。
+
+与最大池化相比，平均池化可以保留更多的细节信息，因为它考虑了更多的输入元素。
+
+池化操作的主要优点包括：
+- 减小特征图的尺寸，降低模型的计算复杂度。
+- 提取主要特征，保留更显著的信息。
+- 对输入数据的平移不变性，使得模型对输入的微小位置变化具有鲁棒性。
+
+需要注意的是，池化操作没有可训练的参数，它仅对输入数据进行形状变换和聚合。此外，池化操作还可以应用于多通道的特征图，每个通道独立进行池化操作。
+
+池化操作在卷积神经网络（CNN）等深度学习模型中广泛应用，有助于提取关键特征并减少数据的维度，从而改善模型的性能和效率。
+
+```python
+矩阵：
+0 1 2
+3 4 5
+6 7 8
+
+经过2x2最大汇聚层函数：
+max(0, 1, 3, 4) = 4,
+max(1, 2, 4, 5) = 5,
+max(3, 4, 6, 7) = 7,
+max(4, 5, 7, 8) = 8
+
+输出：
+4 5
+7 8
+```
+
+
+### LeNet
+LeNet的架构包含了卷积层（Convolutional Layer）、池化层（Pooling Layer）和全连接层（Fully Connected Layer），并采用了激活函数和多层网络的结构。
+
+下面是LeNet的典型架构：
+1. 输入层（Input Layer）：接受输入图像作为网络的输入。
+2. 卷积层（Convolutional Layer）：通过一系列的卷积操作提取输入图像的特征。每个卷积操作使用一个卷积核对输入特征图进行卷积运算，并通过激活函数进行非线性映射。在LeNet中，卷积层采用了多个卷积核，以获取不同的特征信息。
+3. 池化层（Pooling Layer）：使用池化操作对卷积层的输出进行下采样，减小特征图的尺寸，并保留主要特征。常用的池化操作是最大池化（Max Pooling），它选择每个区域中的最大值作为输出。
+4. 全连接层（Fully Connected Layer）：将池化层的输出展平为一维向量，并通过全连接层进行分类。全连接层由多个神经元组成，每个神经元与前一层的所有神经元相连，通过学习权重来实现特征的组合和分类。
+5. 输出层（Output Layer）：使用softmax激活函数将全连接层的输出转换为概率分布，表示输入图像属于不同类别的概率。
+
+```python
+import torch
+from torch import nn
+
+
+net = nn.Sequential(
+	# 输入1通道，输出6通道
+	nn.Conv2d(1, 6, kernel_size=5, padding=2), nn.Sigmoid(),
+	# 平均池化
+	nn.AvgPool2d(kernel_size=2, stride=2),
+	# 池化后还是6通道，所以输入6通道，指定输出16通道
+	nn.Conv2d(6, 16, kernel_size=5), nn.Sigmoid(),
+	# 再次池化，输出大小变成1, 16, 5, 5
+	nn.AvgPool2d(kernel_size=2, stride=2),
+	nn.Flatten(),
+	# 展平后放入全连接层
+	nn.Linear(16 * 5 * 5, 120), nn.Sigmoid(),
+	nn.Linear(120, 84), nn.Sigmoid(),
+	nn.Linear(84, 10))
+	
+每一步的张量形状：
+Conv2d output shape: torch.Size([1, 6, 28, 28])
+Sigmoid output shape: torch.Size([1, 6, 28, 28])
+AvgPool2d output shape: torch.Size([1, 6, 14, 14])
+Conv2d output shape: torch.Size([1, 16, 10, 10])
+Sigmoid output shape: torch.Size([1, 16, 10, 10])
+AvgPool2d output shape: torch.Size([1, 16, 5, 5])
+Flatten output shape: torch.Size([1, 400])
+
+```
+
+
+### AlexNet
+AlexNet是一种深度卷积神经网络，它的架构相对于之前的模型更深、更大，并引入了一些创新的设计：
+1. 卷积层和池化层的堆叠：AlexNet包含了5个卷积层和3个池化层。这些层的堆叠允许网络学习更复杂、更抽象的特征表示。
+2. 非线性激活函数：AlexNet使用了ReLU（Rectified Linear Unit）作为激活函数，取代了传统的Sigmoid函数。ReLU函数可以提供更好的非线性建模能力，并且减轻了梯度消失问题。
+3. 局部响应归一化（Local Response Normalization）：在卷积层之后，AlexNet引入了局部响应归一化层。这一操作通过对每个特征图的像素进行归一化和抑制，增强了特征的对比度和稀疏性。
+4. Dropout正则化：为了减少过拟合，AlexNet在全连接层之间引入了Dropout层。Dropout会随机地将一部分神经元的输出设为0，从而减少神经元之间的依赖性，提高模型的泛化能力。
+5. 多GPU训练：为了加速训练过程，AlexNet通过数据并行的方式在两个GPU上进行训练。这在当时是一种创新的做法，有助于提高训练速度和模型性能。
+
+```python
+import torch
+from torch import nn
+from d2l import torch as d2l
+net = nn.Sequential(
+	# 这里使用一个11*11的更大窗口来捕捉对象。
+	# 同时，步幅为4，以减少输出的高度和宽度。
+	# 另外，输出通道的数目远大于LeNet
+	nn.Conv2d(1, 96, kernel_size=11, stride=4, padding=1), nn.ReLU(),
+	nn.MaxPool2d(kernel_size=3, stride=2),
+	# 减小卷积窗口，使用填充为2来使得输入与输出的高和宽一致，且增大输出通道数
+	nn.Conv2d(96, 256, kernel_size=5, padding=2), nn.ReLU(),
+	nn.MaxPool2d(kernel_size=3, stride=2),
+	# 使用三个连续的卷积层和较小的卷积窗口。
+	# 除了最后的卷积层，输出通道的数量进一步增加。
+	# 在前两个卷积层之后，汇聚层不用于减少输入的高度和宽度
+	nn.Conv2d(256, 384, kernel_size=3, padding=1), nn.ReLU(),
+	nn.Conv2d(384, 384, kernel_size=3, padding=1), nn.ReLU(),
+	nn.Conv2d(384, 256, kernel_size=3, padding=1), nn.ReLU(),
+	nn.MaxPool2d(kernel_size=3, stride=2),
+	nn.Flatten(),
+	# 这里，全连接层的输出数量是LeNet中的好几倍。使用dropout层来减轻过拟合
+	nn.Linear(6400, 4096), nn.ReLU(),
+	nn.Dropout(p=0.5),
+	nn.Linear(4096, 4096), nn.ReLU(),
+	nn.Dropout(p=0.5),
+	# 最后是输出层。由于这里使用Fashion-MNIST，所以用类别数为10，而非论文中的1000
+	nn.Linear(4096, 10))
+
+每一步的张量形状：
+Conv2d output shape: torch.Size([1, 96, 54, 54])
+ReLU output shape: torch.Size([1, 96, 54, 54])
+MaxPool2d output shape: torch.Size([1, 96, 26, 26])
+Conv2d output shape: torch.Size([1, 256, 26, 26])
+ReLU output shape: torch.Size([1, 256, 26, 26])
+MaxPool2d output shape: torch.Size([1, 256, 12, 12])
+Conv2d output shape: torch.Size([1, 384, 12, 12])
+ReLU output shape: torch.Size([1, 384, 12, 12])
+Conv2d output shape: torch.Size([1, 384, 12, 12])
+ReLU output shape: torch.Size([1, 384, 12, 12])
+Conv2d output shape: torch.Size([1, 256, 12, 12])
+ReLU output shape: torch.Size([1, 256, 12, 12])
+MaxPool2d output shape: torch.Size([1, 256, 5, 5])
+Flatten output shape: torch.Size([1, 6400])
+Linear output shape: torch.Size([1, 4096])
+ReLU output shape: torch.Size([1, 4096])
+Dropout output shape: torch.Size([1, 4096])
+Linear output shape: torch.Size([1, 4096])
+ReLU output shape: torch.Size([1, 4096])
+Dropout output shape: torch.Size([1, 4096])
+Linear output shape: torch.Size([1, 10])
+
+```
+
+### VGG
+VGG是一种以可复用的卷积块构造的深度卷积神经网络。不同的VGG模型可通过每个块中卷积层数量和输出通道数量的差异来定义。
+
+VGG的主要特点是它采用了非常深的网络结构，通过增加网络的深度来提高模型的性能。VGG的核心思想是使用多个小尺寸的卷积核和池化层，以增加网络的深度。相比于较大的卷积核，使用多个小尺寸的卷积核可以增加非线性变换的层数，从而提取更丰富的特征表示。
+
+VGG网络的基本构建块是由卷积层、池化层和全连接层组成的连续堆叠。具体而言，VGG包含了多个卷积块，每个卷积块由一系列的卷积层和一个池化层组成。在VGG中，卷积层通常采用3x3的卷积核，步幅为1，并采用ReLU激活函数。池化层采用2x2的窗口和步幅为2的操作，用于下采样特征图。
+
+VGG的优点之一是其简单而一致的架构，使得它在各种计算机视觉任务中具有很好的通用性。此外，由于其深层网络结构，VGG能够提取丰富的图像特征，并在许多计算机视觉任务中取得出色的性能。
+
+然而，VGG的一个缺点是它的模型参数较多，导致训练和推理的时间和计算资源要求较高。随着后续网络架构的发展，研究人员提出了更加高效和轻量级的模型，但VGG仍然是一个重要的基准模型，对于深度学习研究和理解卷积神经网络的设计原则具有重要意义。
+
+```python
+def vgg(conv_arch):
+	conv_blks = []
+	in_channels = 1
+	# 卷积层部分
+	for (num_convs, out_channels) in conv_arch:
+		conv_blks.append(vgg_block(num_convs, in_channels, out_channels))
+		in_channels = out_channels
+
+	return nn.Sequential(
+		*conv_blks, nn.Flatten(),
+		# 全连接层部分
+		nn.Linear(out_channels * 7 * 7, 4096), nn.ReLU(), nn.Dropout(0.5),
+		nn.Linear(4096, 4096), nn.ReLU(), nn.Dropout(0.5),
+		nn.Linear(4096, 10))
+		
+net = vgg(conv_arch)
+
+c = 1, h = 224, w = 224的图片输出
+Sequential output shape: torch.Size([1, 64, 112, 112])
+Sequential output shape: torch.Size([1, 128, 56, 56])
+Sequential output shape: torch.Size([1, 256, 28, 28])
+Sequential output shape: torch.Size([1, 512, 14, 14])
+Sequential output shape: torch.Size([1, 512, 7, 7])
+Flatten output shape: torch.Size([1, 25088])
+Linear output shape: torch.Size([1, 4096])
+ReLU output shape: torch.Size([1, 4096])
+Dropout output shape: torch.Size([1, 4096])
+Linear output shape: torch.Size([1, 4096])
+ReLU output shape: torch.Size([1, 4096])
+Dropout output shape: torch.Size([1, 4096])
+Linear output shape: torch.Size([1, 10])
+```
+
+
+### NiN
+LeNet、AlexNet和VGG都有一个共同的设计模式：通过一系列的卷积层与汇聚层来提取空间结构特征；然后通过全连接层对特征的表征进行处理。AlexNet和VGG对LeNet的改进主要在于如何扩大和加深这两个模块。或者，可以想象在这个过程的早期使用全连接层。然而，如果使用了全连接层，可能会完全放弃表征的空间结构。网络中的网络（NiN）提供了一个非常简单的解决方案：在每个像素的通道上分别使用多层感知机。
+
+NiN的想法是在每个像素位置（针对每个高度和宽度）应用一个全连接层。如果我们将权重连接到每个空间位置，我们可以将其视为1 × 1卷积层，或作为在每个像素位置上独立作用的全连接层。从另一个角度看，即将空间维度中的每个像素视为单个样本，将通道维度视为不同特征（feature）。
+
+NiN块以一个普通卷积层开始，后面是两个1 × 1的卷积层。这两个1 × 1卷积层充当带有ReLU激活函数的逐像素全连接层。第一层的卷积窗口形状通常由用户设置。随后的卷积窗口形状固定为1 × 1。
+
+```python
+import torch
+from torch import nn
+from d2l import torch as d2l
+
+def nin_block(in_channels, out_channels, kernel_size, strides, padding):
+	return nn.Sequential(
+	nn.Conv2d(in_channels, out_channels, kernel_size, strides, padding),
+	nn.ReLU(),
+	nn.Conv2d(out_channels, out_channels, kernel_size=1), nn.ReLU(),
+	nn.Conv2d(out_channels, out_channels, kernel_size=1), nn.ReLU())
+
+
+'''
+NiN使用窗口形状为11×11、5×5和3×3的卷积层，输出通道数量与AlexNet中的相同。
+每个NiN块后有一个最大汇聚层，汇聚窗口形状为3 × 3，步幅为2。
+'''
+
+net = nn.Sequential(
+	nin_block(1, 96, kernel_size=11, strides=4, padding=0),
+	nn.MaxPool2d(3, stride=2),
+	nin_block(96, 256, kernel_size=5, strides=1, padding=2),
+	nn.MaxPool2d(3, stride=2),
+	nin_block(256, 384, kernel_size=3, strides=1, padding=1),
+	nn.MaxPool2d(3, stride=2),
+	nn.Dropout(0.5),
+	# 标签类别数是10
+	nin_block(384, 10, kernel_size=3, strides=1, padding=1),
+	nn.AdaptiveAvgPool2d((1, 1)),
+	# 将四维的输出转成二维的输出，其形状为(批量大小,10)
+	nn.Flatten())
+
+
+c = 1, h = 224, w = 224
+Sequential output shape: torch.Size([1, 96, 54, 54])
+MaxPool2d output shape: torch.Size([1, 96, 26, 26])
+Sequential output shape: torch.Size([1, 256, 26, 26])
+MaxPool2d output shape: torch.Size([1, 256, 12, 12])
+Sequential output shape: torch.Size([1, 384, 12, 12])
+MaxPool2d output shape: torch.Size([1, 384, 5, 5])
+Dropout output shape: torch.Size([1, 384, 5, 5])
+Sequential output shape: torch.Size([1, 10, 5, 5])
+AdaptiveAvgPool2d output shape: torch.Size([1, 10, 1, 1])
+Flatten output shape: torch.Size([1, 10])
+
+'''
+nn.AdaptiveAvgPool2d((1, 1))
+自适应平均池化操作。它的作用是将输入的特征图按照指定的输出大小进行平均池化。
+具体而言，(1, 1)参数表示输出大小为1x1的特征图。这意味着输入的特征图在空间维度
+上被降低为1x1，即每个特征图通道都会计算一个单一的平均值。
+
+自适应平均池化的好处在于，它可以应用于任意大小的输入特征图，并将其转换为固定大
+小的特征图表示。这对于在不同大小的输入上进行特征提取和分类任务非常有用，因为它
+消除了输入大小的差异，并提供了固定大小的特征表示。
+
+在深度学习中，nn.AdaptiveAvgPool2d常用于将卷积神经网络的最后一层特征图转换为全
+连接层的输入大小。通过对最后一层特征图进行自适应平均池化，可以将其转换为固定大
+小的特征向量，然后传递给全连接层进行分类或其他任务。
+'''
+```
+
+
+### GoogLeNet
+
+GoogLeNet是由Google的研究人员于2014年提出的一种深度卷积神经网络（CNN）架构，也被称为Inception-v1。它是为了解决传统CNN模型在深度和计算效率方面的限制而设计的。
+
+GoogLeNet的设计灵感来自于人类视觉系统的工作原理。它采用了一种称为"Inception模块"的结构，这是一种多尺度的特征提取方法。每个Inception模块由多个并行的卷积层组成，这些卷积层具有不同的卷积核尺寸（例如1x1、3x3和5x5）。通过并行处理不同尺度的特征，GoogLeNet能够捕捉到图像中的细节和全局信息，从而提高了模型的表达能力。
+
+为了减少模型的计算量，GoogLeNet还引入了1x1卷积层。这些1x1卷积层用于降低特征图的维度，并减少后续卷积层的计算量。此外，GoogLeNet还使用了平均池化层来减少空间维度，并通过全连接层进行最终的分类。
+
+为了解决梯度消失的问题，GoogLeNet还引入了辅助分类器。这些辅助分类器位于网络的中间层，通过额外的损失函数来引导梯度流动，从而加速模型的训练过程。
+
+`Inception`的流程图：
+```mermaid
+graph LR
+    A[输入]
+    B[1x1卷积]
+    C[3x3卷积]
+    D[5x5卷积]
+    E[平均池化]
+    F[拼接]
+    G[输出]
+    
+    A -- 输入 --> B
+    A -- 输入 --> C
+    A -- 输入 --> D
+    A -- 输入 --> E
+    B --> F
+    C --> F
+    D --> F
+    E --> F
+    F -- 拼接 --> G
+```
+
+```python
+class Inception(nn.Module):
+# c1--c4是每条路径的输出通道数
+	def __init__(self, in_channels, c1, c2, c3, c4, **kwargs):
+		super(Inception, self).__init__(**kwargs)
+		# 线路1，单1x1卷积层
+		self.p1_1 = nn.Conv2d(in_channels, c1, kernel_size=1)
+		# 线路2，1x1卷积层后接3x3卷积层
+		self.p2_1 = nn.Conv2d(in_channels, c2[0], kernel_size=1)
+		self.p2_2 = nn.Conv2d(c2[0], c2[1], kernel_size=3, padding=1)
+		# 线路3，1x1卷积层后接5x5卷积层
+		self.p3_1 = nn.Conv2d(in_channels, c3[0], kernel_size=1)
+		self.p3_2 = nn.Conv2d(c3[0], c3[1], kernel_size=5, padding=2)
+		# 线路4，3x3最大汇聚层后接1x1卷积层
+		self.p4_1 = nn.MaxPool2d(kernel_size=3, stride=1, padding=1)
+		self.p4_2 = nn.Conv2d(in_channels, c4, kernel_size=1)
+		
+		
+def forward(self, x):
+	# 使用relu激活函数
+	p1 = F.relu(self.p1_1(x))
+	p2 = F.relu(self.p2_2(F.relu(self.p2_1(x))))
+	p3 = F.relu(self.p3_2(F.relu(self.p3_1(x))))
+	p4 = F.relu(self.p4_2(self.p4_1(x)))
+	# 在通道维度上连结输出
+	return torch.cat((p1, p2, p3, p4), dim=1)
+	
+
+# 第一个模块使用64个通道、7 × 7卷积层。
+b1 = nn.Sequential(nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3),
+	nn.ReLU(),
+	nn.MaxPool2d(kernel_size=3, stride=2, padding=1))
+	
+
+# 第二个模块使用两个卷积层：第一个卷积层是64个通道、1 × 1卷积层；第二个卷积层使用将通道数量增加三
+# 倍的3 × 3卷积层。这对应于Inception块中的第二条路径。
+b2 = nn.Sequential(nn.Conv2d(64, 64, kernel_size=1),
+	nn.ReLU(),
+	nn.Conv2d(64, 192, kernel_size=3, padding=1),
+	nn.ReLU(),
+	nn.MaxPool2d(kernel_size=3, stride=2, padding=1))
+	
+	
+# 第三个模块串联两个完整的Inception块。第一个Inception块的输出通道数为64 + 128 + 32 + 32 = 256，四
+# 个路径之间的输出通道数量比为64 : 128 : 32 : 32 = 2 : 4 : 1 : 1。第二个和第三个路径首先将输入通道的数量
+# 分别减少到96/192 = 1/2和16/192 = 1/12，然后连接第二个卷积层。第二个Inception块的输出通道数增加
+# 到128 + 192 + 96 + 64 = 480，四个路径之间的输出通道数量比为128 : 192 : 96 : 64 = 4 : 6 : 3 : 2。第二条和
+# 第三条路径首先将输入通道的数量分别减少到128/256 = 1/2和32/256 = 1/8。
+b3 = nn.Sequential(Inception(192, 64, (96, 128), (16, 32), 32),
+	Inception(256, 128, (128, 192), (32, 96), 64),
+	nn.MaxPool2d(kernel_size=3, stride=2, padding=1))
+	
+
+# 第四模块更加复杂，它串联了5个Inception块，其输出通道数分别是192 + 208 + 48 + 64 = 512、160 + 224 +
+# 64 + 64 = 512、128 + 256 + 64 + 64 = 512、112 + 288 + 64 + 64 = 528和256 + 320 + 128 + 128 = 832。这些
+# 路径的通道数分配和第三模块中的类似，首先是含3×3卷积层的第二条路径输出最多通道，其次是仅含1×1卷
+# 积层的第一条路径，之后是含5×5卷积层的第三条路径和含3×3最大汇聚层的第四条路径。其中第二、第三条
+# 路径都会先按比例减小通道数。这些比例在各个Inception块中都略有不同。
+b4 = nn.Sequential(Inception(480, 192, (96, 208), (16, 48), 64),
+	Inception(512, 160, (112, 224), (24, 64), 64),
+	Inception(512, 128, (128, 256), (24, 64), 64),
+	Inception(512, 112, (144, 288), (32, 64), 64),
+	Inception(528, 256, (160, 320), (32, 128), 128),
+	nn.MaxPool2d(kernel_size=3, stride=2, padding=1))
+	
+
+# 第五模块包含输出通道数为256 + 320 + 128 + 128 = 832和384 + 384 + 128 + 128 = 1024的两个Inception块。
+# 其中每条路径通道数的分配思路和第三、第四模块中的一致，只是在具体数值上有所不同。需要注意的是，第
+# 五模块的后面紧跟输出层，该模块同NiN一样使用全局平均汇聚层，将每个通道的高和宽变成1。最后我们将
+# 输出变成二维数组，再接上一个输出个数为标签类别数的全连接层。
+b5 = nn.Sequential(Inception(832, 256, (160, 320), (32, 128), 128),
+	Inception(832, 384, (192, 384), (48, 128), 128),
+	nn.AdaptiveAvgPool2d((1,1)),
+	nn.Flatten())
+
+
+net = nn.Sequential(b1, b2, b3, b4, b5, nn.Linear(1024, 10))
+```
